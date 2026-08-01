@@ -2866,7 +2866,11 @@ function resize(){
 addEventListener('resize', resize); resize();
 
 const panel = document.getElementById('panel');
-function togglePanel(){ panel.classList.toggle('on'); paused = panel.classList.contains('on'); }
+function togglePanel(){
+  panel.classList.toggle('on');
+  paused = panel.classList.contains('on');
+  if(!paused) document.getElementById('closeBtn').textContent = 'Back to the fight';
+}
 document.getElementById('openBtn').onclick = togglePanel;
 document.getElementById('closeBtn').onclick = togglePanel;
 document.getElementById('resetBtn').onclick = ()=>{
@@ -3043,6 +3047,14 @@ function buildPanel(){
   });
 }
 buildPanel();
+
+// Open on the menu so nobody is mid-match before they've picked a stage,
+// a fighter or who's holding which controller. It also gives the browser
+// the tap it needs before sound is allowed to start.
+panel.classList.add('on');
+paused = true;
+document.getElementById('closeBtn').textContent = 'Start match';
+
 addEventListener('gamepadconnected', ()=> buildPanel());
 addEventListener('gamepaddisconnected', ()=> buildPanel());
 requestAnimationFrame(loop);
