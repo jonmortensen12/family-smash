@@ -2472,7 +2472,11 @@ function drawProp(f){
 }
 
 /* Limb angles are measured from straight down, positive rotating toward
-   whichever way the fighter is facing. pi/2 = horizontal, pi = straight up. */
+   whichever way the fighter is facing. pi/2 = horizontal, pi = straight up.
+   The second value is the joint bend, applied to the lower segment:
+     knees  bend NEGATIVE — the shin swings backwards, heel toward the seat
+     elbows bend POSITIVE — the forearm swings forwards, hand toward the chin
+   Getting these signs backwards gives you a flamingo. */
 function drawLimb(x, y, th, bend, seg, w, color, face){
   const x1 = x + Math.sin(th)*face*seg, y1 = y + Math.cos(th)*seg;
   const x2 = x1 + Math.sin(th+bend)*face*seg, y2 = y1 + Math.cos(th+bend)*seg;
@@ -2492,64 +2496,69 @@ const POSE = {
   'utilt':    {armF:2.95}, 'usmash':{armF:3.05, armB:3.05}, 'uair':{armF:3.00}, 'upB':{armF:3.05, armB:3.05},
   'dtilt':    {legF:1.45, kneeF:-0.3}, 'dsmash':{legF:1.55, legB:-1.55},
   'dair':     {legF:0.05, legB:0.05, kneeF:0, kneeB:0},
-  'bair':     {legB:-1.65, kneeB:0.1},
+  'bair':     {legB:-1.65, kneeB:-0.1},
   'nair':     {armF:1.25, armB:-1.25, legF:0.85, legB:-0.85},
   'grab':     {armF:1.50, armB:1.35},
   'jab2':     {armB:1.50, armF:0.4},
   'jab3':     {armF:1.70, armB:1.20},
   'neutral-B':{armF:1.72, armB:0.5},
-  'side-B':   {armF:1.50, legF:0.85, kneeF:0.1},
+  'side-B':   {armF:1.50, legF:0.85, kneeF:-0.1},
   'up-B':     {armF:3.05, armB:3.05},
   'down-B':   {legF:1.30, legB:-1.30, kneeF:0, kneeB:0},
   'fthrow':   {armF:1.65, armB:1.10},
   'bthrow':   {armF:-1.30, armB:-1.60},
   'uthrow':   {armF:3.05, armB:2.95},
-  'dthrow':   {armF:0.55, armB:0.45, legF:0.40, legB:-0.40, kneeF:0.7}
+  'dthrow':   {armF:0.55, armB:0.45, legF:0.40, legB:-0.40, kneeF:-0.7}
 };
 
 function limbPose(f){
-  const P = {legF:0.10, legB:-0.10, kneeF:0.22, kneeB:0.22,
-             armF:0.28, armB:-0.28, elbF:0.18, elbB:-0.18};
+  const P = {legF:0.10, legB:-0.10, kneeF:-0.18, kneeB:-0.18,
+             armF:0.28, armB:-0.28, elbF:0.22, elbB:0.22};
   if(f.ledge){
-    P.armF = 2.85; P.armB = 2.95; P.elbF = 0.05; P.elbB = -0.05;
-    P.legF = 0.20; P.legB = -0.28; P.kneeF = 0.45; P.kneeB = 0.35;
+    P.armF = 2.85; P.armB = 2.95; P.elbF = 0.05; P.elbB = 0.05;
+    P.legF = 0.28; P.legB = -0.20; P.kneeF = -0.55; P.kneeB = -0.40;
     return P;
   }
   if(f.shielding){
-    P.kneeF = 0.55; P.kneeB = 0.55; P.armF = 1.15; P.armB = 1.00;
-    P.elbF = -0.6; P.elbB = -0.5;
+    P.legF = 0.30; P.legB = -0.24;
+    P.kneeF = -0.60; P.kneeB = -0.60; P.armF = 0.75; P.armB = 0.60;
+    P.elbF = 1.35; P.elbB = 1.25;
     return P;
   }
   if(f.crouching){
-    P.legF = 0.40; P.legB = -0.40; P.kneeF = 1.00; P.kneeB = 1.00;
-    P.armF = 0.65; P.armB = -0.55; P.elbF = -0.55; P.elbB = 0.45;
+    P.legF = 0.62; P.legB = -0.18; P.kneeF = -1.20; P.kneeB = -1.30;
+    P.armF = 0.55; P.armB = -0.35; P.elbF = 0.85; P.elbB = 0.70;
     P.drop = 0.15;
     return P;
   }
   if(!f.onGround){
-    P.legF = -0.35; P.legB = 0.50; P.kneeF = 0.65; P.kneeB = 0.55;
-    P.armF = 0.75; P.armB = -0.65;
+    P.legF = -0.30; P.legB = 0.55; P.kneeF = -0.70; P.kneeB = -0.85;
+    P.armF = 0.75; P.armB = -0.65; P.elbF = 0.45; P.elbB = 0.35;
     P.lean = clamp(f.vx * 0.020, -0.22, 0.22);
   } else if(Math.abs(f.vx) > 0.5){
     const sw = Math.sin(f.walkPhase);
     P.legF = sw*0.60;  P.legB = -sw*0.60;
-    P.kneeF = 0.20 + Math.max(0,-sw)*0.5; P.kneeB = 0.20 + Math.max(0,sw)*0.5;
+    // the trailing leg bends most, and the arms swing opposite the legs
+    P.kneeF = -(0.18 + Math.max(0,-sw)*0.75);
+    P.kneeB = -(0.18 + Math.max(0, sw)*0.75);
     P.armF = -sw*0.45; P.armB = sw*0.45;
+    P.elbF = 0.30 + Math.max(0,-sw)*0.45;
+    P.elbB = 0.30 + Math.max(0, sw)*0.45;
     P.lean = clamp(f.vx * 0.030, -0.26, 0.26);
   } else {
     // Relaxed fighting stance: hands up, weight on the back foot,
     // breathing, with a small idle sway.
     const t = frame*0.055 + f.pi*1.9;
-    P.armF = 1.02 + Math.sin(t)*0.10;        P.elbF = -1.18;
-    P.armB = 0.80 + Math.sin(t + 0.7)*0.10;  P.elbB = -1.02;
-    P.legF = 0.36; P.kneeF = 0.26 + Math.sin(t)*0.05;
-    P.legB = -0.32; P.kneeB = 0.40;
+    P.armF = 0.52 + Math.sin(t)*0.08;        P.elbF = 1.78 + Math.sin(t)*0.10;
+    P.armB = 0.30 + Math.sin(t + 0.7)*0.08;  P.elbB = 1.88 + Math.sin(t+0.7)*0.10;
+    P.legF = 0.34; P.kneeF = -(0.32 + Math.sin(t)*0.05);
+    P.legB = -0.28; P.kneeB = -0.46;
     P.drop = 0.012 + Math.sin(t*1.7)*0.011;
     P.lean = 0.05 * f.face;
   }
   if(f.hitstun > 0){
     P.legF = -0.5; P.legB = 0.6; P.armF = -0.9; P.armB = 1.0;
-    P.kneeF = 0.3; P.kneeB = 0.3;
+    P.kneeF = -0.35; P.kneeB = -0.30; P.elbF = 0.25; P.elbB = 0.25;
     return P;
   }
   const pose = f.act ? (POSE[f.act.name] || (/swing$/.test(f.act.name) ? POSE['bat swing'] : null)) : null;
@@ -2562,15 +2571,16 @@ function limbPose(f){
       if(key.startsWith('knee') || key.startsWith('elb')) P[key] = t[key];
       else P[key] = P[key] * (1-Math.abs(k)) + t[key] * k;
     }
-    if(!windup){ P.elbF = 0.02; P.elbB = -0.02; if(t.legF!==undefined) P.kneeF = t.kneeF ?? 0.05; }
+    if(!windup){ P.elbF = 0.04; P.elbB = 0.04; if(t.legF!==undefined) P.kneeF = t.kneeF ?? -0.06; }
   }
   if(f.charging){
-    P.armF = 2.0; P.armB = -0.9; P.kneeF = 0.5; P.kneeB = 0.5;
+    P.armF = 2.0; P.armB = -0.9; P.elbF = 0.35; P.elbB = 0.30;
+    P.legF = 0.40; P.legB = -0.30; P.kneeF = -0.55; P.kneeB = -0.60;
   }
   // Lucy's pirouette turns the whole figure: arms in fifth, one foot in passe
   if(f.act && f.act.name === 'neutral-B' && f.key === 'lucy'){
-    P.armF = 2.85; P.armB = 2.95; P.elbF = 0.12; P.elbB = -0.12;
-    P.legF = 1.15; P.kneeF = -1.75; P.legB = 0.02; P.kneeB = 0.03;
+    P.armF = 2.85; P.armB = 2.95; P.elbF = 0.12; P.elbB = 0.12;
+    P.legF = 1.15; P.kneeF = -1.75; P.legB = 0.02; P.kneeB = -0.04;
     P.spin = frame * 0.55 * f.face;
   }
   return P;
@@ -3115,12 +3125,8 @@ addEventListener('gamepaddisconnected', ()=> buildPanel());
 requestAnimationFrame(loop);
 </script>
 <script>
-// Registers the service worker so the game can be installed to a home
-// screen and still run with no signal.
 if('serviceWorker' in navigator){
-  addEventListener('load', ()=>{
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  });
+  addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
 }
 </script>
 </body>
