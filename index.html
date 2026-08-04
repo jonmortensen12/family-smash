@@ -172,6 +172,8 @@ const ctx = cv.getContext('2d');
 
 const TUNE = {
   gravity: 1.0,          // global multiplier on per-character gravity
+  fallGravity: 0.70,     // extra multiplier while descending — makes falls floaty
+  fallSpeed: 0.80,       // multiplier on each character's terminal fall speed
   launchScale: 0.68,     // knockback units -> pixels/frame
   launchDecay: 0.955,    // air drag on a launched fighter
   hitstunScale: 0.42,    // knockback units -> frames of hitstun
@@ -1436,7 +1438,8 @@ function updateFighter(f, foe, inp){
     f.vx += inp.lx * 0.16;
     f.vy += inp.ly * 0.10;
     f.vx *= TUNE.launchDecay;
-    f.vy = f.vy * TUNE.launchDecay + c.grav * TUNE.gravity * 0.55;
+    f.vy = f.vy * TUNE.launchDecay +
+           c.grav * TUNE.gravity * 0.55 * (f.vy > 0 ? TUNE.fallGravity : 1);
     moveAndCollide(f);
     return;
   }
@@ -1616,9 +1619,10 @@ function physics(f, inp, restricted){
     f.vx *= 0.86;
   }
   const fast = inp.ly > 0.6 && f.vy > 0;
-  f.vy += c.grav * TUNE.gravity * (fast ? 1.7 : 1) * (f.gliding > 0 ? 0.34 : 1);
+  const descending = f.vy > 0 ? TUNE.fallGravity : 1;
+  f.vy += c.grav * TUNE.gravity * descending * (fast ? 1.7 : 1) * (f.gliding > 0 ? 0.34 : 1);
   if(f.gliding > 0) f.vy = Math.min(f.vy, 3.2);
-  f.vy = Math.min(f.vy, c.fall * (fast ? 1.5 : 1));
+  f.vy = Math.min(f.vy, c.fall * TUNE.fallSpeed * (fast ? 1.6 : 1));
   moveAndCollide(f);
   if(f.onGround) f.walkPhase += Math.abs(f.vx) * 0.17; else f.walkPhase = 0;
   tryLedge(f);
@@ -2247,6 +2251,17 @@ function drawItemArt(kind, x, y, s, rot){
   ctx.restore();
 }
 
+function drawFoot(pt, face, color, w){
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(pt.x + face*w*0.34, pt.y + 1.5, w*0.66, w*0.32, 0, 0, Math.PI*2);
+  ctx.fill();
+}
+function drawHand(pt, color, r){
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(pt.x, pt.y, r, 0, Math.PI*2); ctx.fill();
+}
+
 function mirrored(f, x, y, fn){
   ctx.save(); ctx.translate(x, y); ctx.scale(f.face, 1); fn(); ctx.restore();
 }
@@ -2514,11 +2529,23 @@ function limbPose(f){
   if(!f.onGround){
     P.legF = -0.35; P.legB = 0.50; P.kneeF = 0.65; P.kneeB = 0.55;
     P.armF = 0.75; P.armB = -0.65;
+    P.lean = clamp(f.vx * 0.020, -0.22, 0.22);
   } else if(Math.abs(f.vx) > 0.5){
     const sw = Math.sin(f.walkPhase);
     P.legF = sw*0.60;  P.legB = -sw*0.60;
     P.kneeF = 0.20 + Math.max(0,-sw)*0.5; P.kneeB = 0.20 + Math.max(0,sw)*0.5;
     P.armF = -sw*0.45; P.armB = sw*0.45;
+    P.lean = clamp(f.vx * 0.030, -0.26, 0.26);
+  } else {
+    // Relaxed fighting stance: hands up, weight on the back foot,
+    // breathing, with a small idle sway.
+    const t = frame*0.055 + f.pi*1.9;
+    P.armF = 1.02 + Math.sin(t)*0.10;        P.elbF = -1.18;
+    P.armB = 0.80 + Math.sin(t + 0.7)*0.10;  P.elbB = -1.02;
+    P.legF = 0.36; P.kneeF = 0.26 + Math.sin(t)*0.05;
+    P.legB = -0.32; P.kneeB = 0.40;
+    P.drop = 0.012 + Math.sin(t*1.7)*0.011;
+    P.lean = 0.05 * f.face;
   }
   if(f.hitstun > 0){
     P.legF = -0.5; P.legB = 0.6; P.armF = -0.9; P.armB = 1.0;
@@ -2617,31 +2644,59 @@ function drawFighter(f){
   if(f.c.quad){
     drawQuad(f, skin, dark, bw, bh, cx, by, P);
   } else {
-    const tw = bw * 0.56;                     // narrow torso keeps the limbs readable
     const dy = (P.drop || 0) * bh;
     const pivotY = by - bh*0.42;
     if(P.spin){
       ctx.save();
       ctx.translate(cx, pivotY); ctx.rotate(P.spin); ctx.translate(-cx, -pivotY);
     }
-    const hipY = by - bh*0.36 + dy, shY = by - bh*0.64 + dy;
+    const shW = bw * 0.66, hipW = bw * 0.46;      // wide shoulders, narrow waist
+    const hipY = by - bh*0.36 + dy, shY = by - bh*0.66 + dy;
     const legSeg = bh*0.18, armSeg = bh*0.165;
+    const lean = P.lean || 0;
 
-    // back arm and back leg sit behind the torso
-    drawLimb(cx - f.face*tw*0.20, hipY, P.legB, P.kneeB, legSeg, bw*0.15, dark, f.face);
-    drawLimb(cx - f.face*tw*0.58, shY,  P.armB, P.elbB,  armSeg, bw*0.12, dark, f.face);
+    // The torso tilts into the run; shoulder and head anchors are rotated
+    // with it by hand so the arms stay in world coordinates for props.
+    const cosL = Math.cos(lean), sinL = Math.sin(lean);
+    const rot = (px, py) => ({
+      x: cx + (px - cx)*cosL - (py - hipY)*sinL,
+      y: hipY + (px - cx)*sinL + (py - hipY)*cosL
+    });
+    const shF = rot(cx + f.face*shW*0.40, shY);
+    const shB = rot(cx - f.face*shW*0.40, shY);
+
+    // far side limbs
+    const legBEnd = drawLimb(cx - f.face*hipW*0.36, hipY, P.legB, P.kneeB, legSeg, bw*0.15, dark, f.face);
+    drawFoot(legBEnd, f.face, dark, bw*0.20);
+    const armBEnd = drawLimb(shB.x, shB.y, P.armB, P.elbB, armSeg, bw*0.12, dark, f.face);
+    drawHand(armBEnd, dark, bw*0.095);
 
     // torso
+    ctx.save();
+    ctx.translate(cx, hipY); ctx.rotate(lean); ctx.translate(-cx, -hipY);
     ctx.fillStyle = skin;
-    roundRect(cx - tw/2, by - bh*0.72 + dy, tw, bh*0.38, 8); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - shW/2, shY);
+    ctx.quadraticCurveTo(cx + f.face*shW*0.12, shY - bh*0.075, cx + shW/2, shY);
+    ctx.lineTo(cx + hipW/2, hipY);
+    ctx.quadraticCurveTo(cx, hipY + bh*0.018, cx - hipW/2, hipY);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = dark;                                   // belt
+    ctx.fillRect(cx - hipW/2, hipY - bh*0.05, hipW, bh*0.05);
+    ctx.fillStyle = skin;                                   // neck
+    ctx.fillRect(cx + f.face*bw*0.05 - bw*0.085, shY - bh*0.075, bw*0.17, bh*0.085);
+    ctx.restore();
 
-    // front leg and front arm in front
-    drawLimb(cx + f.face*tw*0.20, hipY, P.legF, P.kneeF, legSeg, bw*0.17, skin, f.face);
-    f.handPos = drawLimb(cx + f.face*tw*0.58, shY, P.armF, P.elbF, armSeg, bw*0.14, skin, f.face);
+    // near side limbs
+    const legFEnd = drawLimb(cx + f.face*hipW*0.36, hipY, P.legF, P.kneeF, legSeg, bw*0.17, skin, f.face);
+    drawFoot(legFEnd, f.face, skin, bw*0.22);
+    f.handPos = drawLimb(shF.x, shF.y, P.armF, P.elbF, armSeg, bw*0.14, skin, f.face);
+    drawHand(f.handPos, skin, bw*0.11);
 
     // head — sized so a photo reads at TV distance
     const hr = f.w*0.50;
-    drawHead(f, cx + f.face*3, by - bh*0.72 + dy - hr*0.80, hr);
+    const hp = rot(cx + f.face*bw*0.06, shY - bh*0.075 - hr*0.72);
+    drawHead(f, hp.x, hp.y, hr);
     if(P.spin) ctx.restore();
   }
 
