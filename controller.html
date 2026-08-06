@@ -34,6 +34,7 @@
     color:#101720;font-weight:700;font-size:16px}
   button:disabled{opacity:.5}
   .msg{font-size:12px;color:var(--gold);margin-top:14px;line-height:1.6;min-height:1.2em}
+  .stamp{font-size:10px;color:var(--dim);margin-top:18px;letter-spacing:.08em;text-align:center}
   .chars{display:flex;flex-direction:column;gap:9px;margin-top:6px}
   .chars button{text-align:left;padding:15px}
   .chars button b{font-size:16px}
@@ -84,6 +85,7 @@
            autocapitalize="characters" spellcheck="false">
     <button class="go" id="joinBtn">Join</button>
     <div class="msg" id="joinMsg"></div>
+    <div class="stamp" id="build"></div>
   </div>
 </div>
 
@@ -135,6 +137,7 @@ window.onerror = function(msg, src, line){
   return false;
 };
 
+const BUILD = 'controller build 11';
 const BTN = {jump:1, attack:2, special:4, grab:8, smash:16, shield:32};
 const state = {x:0, y:0, b:0};
 let conn = null, peer = null, myChar = null, roster = [];
@@ -147,7 +150,8 @@ const show = id => ['join','pick','pad'].forEach(s =>
 let joinTimer = null;
 function say(msg){ $('joinMsg').textContent = msg; }
 
-$('joinBtn').onclick = () => {
+function onJoinTap(){
+  say('Tap received…');
   const code = ($('code').value || '').trim().toUpperCase();
   if(code.length !== 4){ say('Enter the four-letter code shown on the game screen.'); return; }
   if(typeof Peer === 'undefined'){
@@ -194,7 +198,12 @@ $('joinBtn').onclick = () => {
       fail('Connection problem: ' + t);
     }
   });
-};
+}
+
+// bound three ways, so a stray CSS or gesture quirk can't swallow the tap
+$('joinBtn').onclick = onJoinTap;
+$('joinBtn').addEventListener('click', e => { e.preventDefault(); });
+$('joinBtn').addEventListener('touchend', e => { e.preventDefault(); onJoinTap(); });
 
 function fail(msg){
   clearTimeout(joinTimer);
@@ -345,6 +354,7 @@ if('wakeLock' in navigator){
     if(document.visibilityState === 'visible') navigator.wakeLock.request('screen').catch(()=>{});
   });
 }
+$('build').textContent = BUILD + (typeof Peer === 'undefined' ? ' \u00b7 library missing' : ' \u00b7 ready');
 $('code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 
 // A link like .../controller.html#ABCD arrives with the room already filled in.
