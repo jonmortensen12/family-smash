@@ -126,6 +126,15 @@
    leave the local network.
    ============================================================ */
 
+// Phones have no console, so anything that goes wrong gets shown on screen.
+window.onerror = function(msg, src, line){
+  const m = document.getElementById('joinMsg');
+  if(m) m.textContent = 'Script error: ' + msg + ' (line ' + line + ')';
+  const b = document.getElementById('joinBtn');
+  if(b) b.disabled = false;
+  return false;
+};
+
 const BTN = {jump:1, attack:2, special:4, grab:8, smash:16, shield:32};
 const state = {x:0, y:0, b:0};
 let conn = null, peer = null, myChar = null, roster = [];
@@ -135,47 +144,70 @@ const show = id => ['join','pick','pad'].forEach(s =>
   $(s).classList.toggle('on', s === id));
 
 /* ---------- joining ---------- */
+let joinTimer = null;
+function say(msg){ $('joinMsg').textContent = msg; }
+
 $('joinBtn').onclick = () => {
   const code = ($('code').value || '').trim().toUpperCase();
-  if(code.length !== 4){ $('joinMsg').textContent = 'The code is four letters.'; return; }
+  if(code.length !== 4){ say('Enter the four-letter code shown on the game screen.'); return; }
   if(typeof Peer === 'undefined'){
-    $('joinMsg').textContent = 'Connection library did not load. Check the phone has internet for this first step.';
+    say('The connection library did not load. This phone needs internet for the first step — check its signal and reload the page.');
     return;
   }
+  // a stale attempt must never leave the button stuck
+  try { if(peer) peer.destroy(); } catch(e){}
+  peer = null; conn = null;
+  clearTimeout(joinTimer);
+
   $('joinBtn').disabled = true;
-  $('joinMsg').textContent = 'Connecting…';
+  say('Step 1 of 2 — getting an address…');
+
+  joinTimer = setTimeout(() => {
+    fail('Timed out. The game screen must have its lobby open, showing this same code, and both devices need to be on the same wifi.');
+  }, 15000);
 
   peer = new Peer({pingInterval: 4000});
+
   peer.on('open', () => {
-    conn = peer.connect('fsmash-' + code, {reliable: false});
+    say('Step 2 of 2 — looking for room ' + code + '…');
+    conn = peer.connect('fsmash-' + code);      // reliable channel: widest support
     conn.on('open', () => {
+      clearTimeout(joinTimer);
       conn.send({t:'hello', name: ($('name').value || 'Player').trim().slice(0,12)});
-      $('joinMsg').textContent = '';
+      say('');
+      $('joinBtn').disabled = false;
       show('pick');
       startSending();
     });
     conn.on('data', onHostData);
     conn.on('close', dropped);
-    conn.on('error', () => fail('Could not reach that room.'));
+    conn.on('error', e => fail('Room error: ' + ((e && e.type) || 'unknown')));
   });
+
   peer.on('error', err => {
-    const t = err && err.type;
-    fail(t === 'peer-unavailable'
-      ? 'No room with that code. Check the code on the game screen.'
-      : 'Connection problem (' + (t || 'unknown') + ').');
+    const t = (err && err.type) || 'unknown';
+    if(t === 'peer-unavailable'){
+      fail('No room called ' + code + '. Check the code on the game screen — it changes each time the lobby is opened.');
+    } else if(t === 'network' || t === 'server-error' || t === 'socket-error'){
+      fail('Could not reach the matchmaking server (' + t + '). This step needs internet.');
+    } else {
+      fail('Connection problem: ' + t);
+    }
   });
 };
 
 function fail(msg){
-  $('joinMsg').textContent = msg;
+  clearTimeout(joinTimer);
+  say(msg);
   $('joinBtn').disabled = false;
   try { if(peer) peer.destroy(); } catch(e){}
   peer = null; conn = null;
 }
 function dropped(){
+  clearTimeout(joinTimer);
   show('join');
   $('joinBtn').disabled = false;
-  $('joinMsg').textContent = 'Disconnected from the game.';
+  say('Disconnected from the game. Press Join to reconnect.');
   conn = null;
 }
 
@@ -316,6 +348,13 @@ if('wakeLock' in navigator){
 $('code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 
 // A link like .../controller.html#ABCD arrives with the room already filled in.
+// If the library is missing the Join button can never work, so say so now.
+window.addEventListener('load', ()=>{
+  if(typeof Peer === 'undefined'){
+    say('Heads up: the connection library did not load. This phone needs internet for the first step. Reload once you have signal.');
+  }
+});
+
 (function fromLink(){
   const raw = (location.hash || location.search || '').replace(/[^A-Za-z0-9]/g, '');
   const code = raw.toUpperCase().slice(0, 4);

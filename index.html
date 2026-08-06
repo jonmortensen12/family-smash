@@ -174,7 +174,7 @@
 
 // Bump this whenever the file changes — it shows at the bottom of the menu
 // so you can tell at a glance which build a device is actually running.
-const BUILD = 'build 9 \u00b7 8 players + phone controllers';
+const BUILD = 'build 10 \u00b7 phone lobby diagnostics';
 console.log('Family Smash', BUILD);
 
 const W = 1280, H = 720;
@@ -450,16 +450,29 @@ function loadPeerJS(cb){
 
 function netStart(){
   if(NET.peer) return;
-  NET.status = 'Starting…';
+  NET.status = 'Loading the connection library…';
   buildPanel();
   loadPeerJS(()=>{
-    if(!window.Peer){ return; }
+    if(!window.Peer){
+      NET.status = 'The connection library did not load. This device needs internet to open a lobby.';
+      buildPanel();
+      return;
+    }
+    NET.status = 'Registering the room…';
+    buildPanel();
     const code = netCodeGen();
     const peer = new Peer('fsmash-' + code, {pingInterval: 4000});
     NET.peer = peer;
     NET.code = code;
 
-    peer.on('open', ()=>{ NET.status = 'ready'; buildPanel(); });
+    peer.on('open', ()=>{ NET.status = 'ready'; console.log('Lobby open, room code', code); buildPanel(); });
+    // if the broker never answers, say so rather than sitting on 'Registering'
+    setTimeout(()=>{
+      if(NET.status !== 'ready' && NET.peer === peer){
+        NET.status = 'The lobby did not finish opening. Check this device has internet, then reopen the menu and try again.';
+        buildPanel();
+      }
+    }, 15000);
 
     peer.on('error', err=>{
       const type = err && err.type;
@@ -3328,10 +3341,14 @@ function buildPanel(){
 
   // A link that carries the room code, so joining is one tap.
   const joinUrl = controllerUrl(NET.status === 'ready' ? NET.code : null);
+  const ready = NET.status === 'ready' && NET.code;
   const share = document.createElement('button');
   share.className = 'wide';
-  share.textContent = 'Send join link';
+  share.textContent = ready ? 'Send join link' : 'Open the lobby first';
+  share.disabled = !ready;
+  share.style.opacity = ready ? 1 : 0.45;
   share.onclick = ()=>{
+    if(!ready) return;
     const done = m => { share.textContent = m; setTimeout(()=>{ share.textContent = 'Send join link'; }, 1800); };
     if(navigator.share){
       navigator.share({title:'Family Smash', text:'Join the game', url:joinUrl})
@@ -3353,7 +3370,7 @@ function buildPanel(){
 
   if(NET.status === 'ready' && NET.code){
     lobbyInfo.innerHTML =
-      'Room code <b>' + NET.code + '</b><br>' +
+      'Room code <b>' + NET.code + '</b> &nbsp;(a new code each time you open the lobby)<br>' +
       'Send the join link to everyone, or have them open <code>' + joinUrl + '</code><br>' +
       'Connected: ' + (NET.phones.length
         ? NET.phones.map(q=>q.name).join(', ')
