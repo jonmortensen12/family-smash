@@ -85,7 +85,8 @@
            autocapitalize="characters" spellcheck="false">
     <button class="go" id="joinBtn">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp" id="build"></div>
+    <div class="stamp">controller build 12</div>
+    <div class="stamp" id="libState">loading connection library…</div>
   </div>
 </div>
 
@@ -120,7 +121,25 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1/dist/peerjs.min.js"></script>
+<script>
+(function loadLib(){
+  const mark = t => { const e = document.getElementById('libState'); if(e) e.textContent = t; };
+  const sources = [
+    'https://unpkg.com/peerjs@1/dist/peerjs.min.js',
+    'https://cdn.jsdelivr.net/npm/peerjs@1/dist/peerjs.min.js'
+  ];
+  let i = 0;
+  (function tryNext(){
+    if(i >= sources.length){ mark('connection library unavailable — this page needs internet once'); return; }
+    const sc = document.createElement('script');
+    sc.src = sources[i++];
+    sc.crossOrigin = 'anonymous';
+    sc.onload = () => mark('connection library ready');
+    sc.onerror = () => { sc.remove(); tryNext(); };
+    document.head.appendChild(sc);
+  })();
+})();
+</script>
 <script>
 /* ============================================================
    Phone controller. Talks to the host over a WebRTC data
@@ -354,7 +373,6 @@ if('wakeLock' in navigator){
     if(document.visibilityState === 'visible') navigator.wakeLock.request('screen').catch(()=>{});
   });
 }
-$('build').textContent = BUILD + (typeof Peer === 'undefined' ? ' \u00b7 library missing' : ' \u00b7 ready');
 $('code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 
 // A link like .../controller.html#ABCD arrives with the room already filled in.
