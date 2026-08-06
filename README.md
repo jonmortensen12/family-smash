@@ -9,10 +9,37 @@ browser and installable to a phone home screen.
 | --- | --- |
 | `index.html` | The whole game. Faces, sounds and stages are all embedded. |
 | `manifest.webmanifest` | Tells the phone the name, icon and that it opens fullscreen. |
+| `controller.html` | The page each phone opens to act as a gamepad. |
 | `sw.js` | Service worker. Makes it installable and playable with no signal. |
 | `icon-192.png` / `icon-512.png` | Home screen icons. |
 
-All four support files must sit in the **same folder** as `index.html`.
+All five support files must sit in the **same folder** as `index.html`.
+
+## Playing with phones as controllers
+
+Up to eight players. Open the game on a computer, TV or phone — that device is
+the host. In the menu, choose **Number of players**, then under *Phone
+controllers* press **Open phone lobby**. A four-letter code appears.
+
+Press **Send join link** and the phone's share sheet opens — text it to
+everyone at once, or it copies to the clipboard on a computer. The link
+already contains the room code, so tapping it goes straight to the name field.
+Failing that, the address is just your game link with the filename swapped:
+`.../family-smash/controller.html`.
+
+Each person types a name and picks a fighter. They get a touch pad: slide
+anywhere on the left to move, buttons on the right, and flicking the stick up
+jumps so you don't have to reach for a button.
+
+Phones talk **directly** to the host over your wifi, so presses don't travel
+out to a server and back. The one thing that needs internet is the initial
+handshake, which happens once when a phone joins. After that a dropped
+internet connection won't interrupt play.
+
+Controllers plugged into the host keep working alongside phones — assign each
+slot to a controller, a keyboard layout, a phone, or the CPU.
+
+Stages marked **(big)** are sized for six to eight players.
 
 ## Putting it on GitHub
 

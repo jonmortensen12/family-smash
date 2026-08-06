@@ -1,10 +1,11 @@
 /* Family Smash service worker.
    Network first, cache second: re-uploading index.html shows up on the
    next load, and the game still runs with no signal. */
-const CACHE = 'family-smash-v1';
+const CACHE = 'family-smash-v2';
 const ASSETS = [
   './',
   './index.html',
+  './controller.html',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png'
