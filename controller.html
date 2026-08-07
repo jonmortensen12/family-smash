@@ -94,7 +94,7 @@
              ' - stage was ' + document.getElementById('stage').textContent; }
     ">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp">controller build 16</div>
+    <div class="stamp">controller build 17</div>
     <div class="stamp" id="stage">stage: script has not started</div>
     <div class="stamp" id="err"></div>
     <div class="stamp" id="libState">loading connection library…</div>
@@ -333,7 +333,7 @@ document.getElementById('stage').textContent =
     : 'stage: JOIN BLOCK FAILED TO PARSE';
 </script>
 <script>/* ---------- the stick ---------- */
-const zone = $('stickZone'), base = $('stickBase'), top = $('stickTop');
+const zone = $('stickZone'), base = $('stickBase'), knob = $('stickTop');
 let stickId = null, originX = 0, originY = 0;
 const RADIUS = () => Math.min(innerWidth, innerHeight) * 0.17;
 
@@ -343,9 +343,9 @@ zone.addEventListener('pointerdown', e => {
   zone.setPointerCapture(e.pointerId);
   const r = zone.getBoundingClientRect();
   originX = e.clientX - r.left; originY = e.clientY - r.top;
-  base.style.left = top.style.left = originX + 'px';
-  base.style.top  = top.style.top  = originY + 'px';
-  base.style.opacity = 1; top.style.opacity = 1;
+  base.style.left = knob.style.left = originX + 'px';
+  base.style.top  = knob.style.top  = originY + 'px';
+  base.style.opacity = 1; knob.style.opacity = 1;
   $('stickHint').style.opacity = 0;
   moveStick(e);
 });
@@ -354,7 +354,7 @@ function endStick(e){
   if(e.pointerId !== stickId) return;
   stickId = null;
   state.x = 0; state.y = 0;
-  base.style.opacity = 0; top.style.opacity = 0;
+  base.style.opacity = 0; knob.style.opacity = 0;
   $('stickHint').style.opacity = 1;
 }
 zone.addEventListener('pointerup', endStick);
@@ -367,8 +367,8 @@ function moveStick(e){
   const rad = RADIUS();
   const mag = Math.hypot(dx, dy);
   if(mag > rad){ dx = dx/mag*rad; dy = dy/mag*rad; }
-  top.style.left = (originX + dx) + 'px';
-  top.style.top  = (originY + dy) + 'px';
+  knob.style.left = (originX + dx) + 'px';
+  knob.style.top  = (originY + dy) + 'px';
   // A small dead zone, then a slightly eased ramp so light touches
   // walk and full pushes run.
   const nx = dx/rad, ny = dy/rad;
