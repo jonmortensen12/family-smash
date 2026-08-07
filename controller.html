@@ -88,11 +88,13 @@
       document.getElementById('stage').textContent = 'stage: tap registered';
       if (window.joinTap) { joinTap(); }
       else { document.getElementById('joinMsg').textContent =
-             'The page script never loaded, so Join cannot work. Tell Claude what the stage line says.'; }
+             'Script did not finish: ' + (window.__err || 'no error captured') +
+             ' - stage was ' + document.getElementById('stage').textContent; }
     ">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp">controller build 13</div>
+    <div class="stamp">controller build 14</div>
     <div class="stamp" id="stage">stage: script has not started</div>
+    <div class="stamp" id="err"></div>
     <div class="stamp" id="libState">loading connection library…</div>
   </div>
 </div>
@@ -157,9 +159,14 @@
 // Phones have no console, so anything that goes wrong gets shown on screen.
 document.getElementById('stage').textContent = 'stage: script running';
 
+// Exported immediately, so nothing later in this file can stop the button
+// from working. It is defined further down; declarations are hoisted.
+window.joinTap = onJoinTap;
+
 window.onerror = function(msg, src, line){
-  const m = document.getElementById('joinMsg');
-  if(m) m.textContent = 'Script error: ' + msg + ' (line ' + line + ')';
+  window.__err = msg + ' (line ' + line + ')';
+  const e = document.getElementById('err');
+  if(e) e.textContent = 'error: ' + window.__err;
   const b = document.getElementById('joinBtn');
   if(b) b.disabled = false;
   return false;
@@ -210,6 +217,7 @@ function onJoinTap(){
       $('joinBtn').disabled = false;
       show('pick');
       startSending();
+      keepAwake();
     });
     conn.on('data', onHostData);
     conn.on('close', dropped);
@@ -372,12 +380,18 @@ function startSending(){
   requestAnimationFrame(tick);
 }
 
-// keep the phone awake if the browser allows it
-if('wakeLock' in navigator){
-  navigator.wakeLock.request('screen').catch(()=>{});
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'visible') navigator.wakeLock.request('screen').catch(()=>{});
-  });
+// Keeping the screen awake is a nicety. iOS throws synchronously if it is
+// asked outside a user gesture, so every call is wrapped and it only runs
+// after a successful join.
+function keepAwake(){
+  try {
+    if(!('wakeLock' in navigator)) return;
+    const ask = () => { try { navigator.wakeLock.request('screen').catch(()=>{}); } catch(e){} };
+    ask();
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState === 'visible') ask();
+    });
+  } catch(e){}
 }
 $('code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 window.joinTap = onJoinTap;
