@@ -92,7 +92,7 @@
              ' - stage was ' + document.getElementById('stage').textContent; }
     ">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp">controller build 14</div>
+    <div class="stamp">controller build 15</div>
     <div class="stamp" id="stage">stage: script has not started</div>
     <div class="stamp" id="err"></div>
     <div class="stamp" id="libState">loading connection library…</div>
@@ -216,8 +216,8 @@ function onJoinTap(){
       say('');
       $('joinBtn').disabled = false;
       show('pick');
-      startSending();
-      keepAwake();
+      if(typeof startSending === 'function') startSending();
+      if(typeof keepAwake === 'function') keepAwake();
     });
     conn.on('data', onHostData);
     conn.on('close', dropped);
@@ -297,7 +297,37 @@ function renderRoster(){
 }
 $('changeBtn').onclick = () => show('pick');
 
-/* ---------- the stick ---------- */
+
+$('code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+window.joinTap = onJoinTap;
+document.getElementById('stage').textContent = 'stage: ready, press Join';
+
+// A link like .../controller.html#ABCD arrives with the room already filled in.
+// If the library is missing the Join button can never work, so say so now.
+window.addEventListener('load', ()=>{
+  if(typeof Peer === 'undefined'){
+    say('Heads up: the connection library did not load. This phone needs internet for the first step. Reload once you have signal.');
+  }
+});
+
+(function fromLink(){
+  const raw = (location.hash || location.search || '').replace(/[^A-Za-z0-9]/g, '');
+  const code = raw.toUpperCase().slice(0, 4);
+  if(code.length === 4){
+    $('code').value = code;
+    $('joinBtn').textContent = 'Join room ' + code;
+    $('name').focus();
+  }
+})();
+</script>
+
+<script>
+document.getElementById('stage').textContent =
+  (typeof onJoinTap === 'function' && typeof window.joinTap === 'function')
+    ? 'stage: join code ready'
+    : 'stage: JOIN BLOCK FAILED TO PARSE';
+</script>
+<script>/* ---------- the stick ---------- */
 const zone = $('stickZone'), base = $('stickBase'), top = $('stickTop');
 let stickId = null, originX = 0, originY = 0;
 const RADIUS = () => Math.min(innerWidth, innerHeight) * 0.17;
@@ -393,27 +423,15 @@ function keepAwake(){
     });
   } catch(e){}
 }
-$('code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
-window.joinTap = onJoinTap;
-document.getElementById('stage').textContent = 'stage: ready, press Join';
+</script>
 
-// A link like .../controller.html#ABCD arrives with the room already filled in.
-// If the library is missing the Join button can never work, so say so now.
-window.addEventListener('load', ()=>{
-  if(typeof Peer === 'undefined'){
-    say('Heads up: the connection library did not load. This phone needs internet for the first step. Reload once you have signal.');
-  }
-});
-
-(function fromLink(){
-  const raw = (location.hash || location.search || '').replace(/[^A-Za-z0-9]/g, '');
-  const code = raw.toUpperCase().slice(0, 4);
-  if(code.length === 4){
-    $('code').value = code;
-    $('joinBtn').textContent = 'Join room ' + code;
-    $('name').focus();
-  }
+<script>
+(function(){
+  var el = document.getElementById('stage');
+  el.textContent += (typeof startSending === 'function')
+    ? ' + pad ready' : ' + PAD BLOCK FAILED';
 })();
 </script>
+
 </body>
 </html>
