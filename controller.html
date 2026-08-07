@@ -51,6 +51,8 @@
   #bar .pct{margin-left:auto;font-size:19px;font-weight:700;color:var(--gold)}
   #bar .stk{color:var(--dim);font-size:12px}
   #bar button{padding:6px 11px;font-size:11px}
+  #diag{padding:4px 14px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--line);
+    flex:none;letter-spacing:.04em}
   #surface{flex:1;position:relative}
   #stickZone{position:absolute;left:0;top:0;bottom:0;width:48%}
   #stickBase,#stickTop{position:absolute;border-radius:50%;pointer-events:none;
@@ -92,7 +94,7 @@
              ' - stage was ' + document.getElementById('stage').textContent; }
     ">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp">controller build 15</div>
+    <div class="stamp">controller build 16</div>
     <div class="stamp" id="stage">stage: script has not started</div>
     <div class="stamp" id="err"></div>
     <div class="stamp" id="libState">loading connection library…</div>
@@ -114,6 +116,9 @@
     <span class="stk" id="barStk"></span>
     <span class="pct" id="barPct">0%</span>
     <button id="changeBtn">Change</button>
+  </div>
+  <div id="diag">
+  </div>
   </div>
   <div id="surface">
     <div id="stickZone">
@@ -393,22 +398,29 @@ wire('bJump', BTN.jump);
 wire('bShield', BTN.shield);
 
 /* ---------- send loop ---------- */
-function startSending(){
-  let lastSent = 0, last = '';
-  const tick = () => {
-    if(conn && conn.open){
-      const now = performance.now();
-      const packed = state.x.toFixed(2) + ',' + state.y.toFixed(2) + ',' + state.b;
-      // send on change, plus a heartbeat so a dropped packet can't stick a button
-      if(packed !== last || now - lastSent > 100){
-        try { conn.send({t:'in', x: state.x, y: state.y, b: state.b}); } catch(e){}
-        last = packed; lastSent = now;
+var txCount = 0, txError = '';
+function startSending(){ /* kept for compatibility; the loop starts itself */ }
+
+(function sendLoop(){
+  var lastSent = 0, last = '';
+  function tick(){
+    try {
+      if(conn && conn.open){
+        var now = Date.now();
+        var packed = state.x.toFixed(2) + ',' + state.y.toFixed(2) + ',' + state.b;
+        if(packed !== last || now - lastSent > 100){
+          conn.send({t:'in', x: state.x, y: state.y, b: state.b});
+          txCount++; last = packed; lastSent = now;
+        }
       }
-    }
+    } catch(e){ txError = e.message; }
+    var d = document.getElementById('diag');
+    if(d) d.textContent = 'sent ' + txCount + '  stick ' + state.x.toFixed(1) + ',' +
+      state.y.toFixed(1) + '  buttons ' + state.b + (txError ? '  err ' + txError : '');
     requestAnimationFrame(tick);
-  };
+  }
   requestAnimationFrame(tick);
-}
+})();
 
 // Keeping the screen awake is a nicety. iOS throws synchronously if it is
 // asked outside a user gesture, so every call is wrapped and it only runs
@@ -428,8 +440,12 @@ function keepAwake(){
 <script>
 (function(){
   var el = document.getElementById('stage');
-  el.textContent += (typeof startSending === 'function')
-    ? ' + pad ready' : ' + PAD BLOCK FAILED';
+  var ok = (typeof startSending === 'function');
+  el.textContent += ok ? ' + pad ready' : ' + PAD BLOCK FAILED';
+  if(!ok){
+    var d = document.getElementById('diag');
+    if(d) d.textContent = 'PAD BLOCK FAILED TO PARSE - buttons will not send anything';
+  }
 })();
 </script>
 
