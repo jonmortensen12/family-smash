@@ -31,7 +31,8 @@
   button{font:inherit;font-size:14px;color:var(--ink);background:#1b2634;
     border:1px solid var(--line);border-radius:10px;padding:14px;cursor:pointer}
   button.go{width:100%;margin-top:22px;background:var(--gold);border-color:var(--gold);
-    color:#101720;font-weight:700;font-size:16px}
+    color:#101720;font-weight:700;font-size:16px;transition:none}
+  button.go:active{background:#ffffff;border-color:#ffffff;transform:scale(.97)}
   button:disabled{opacity:.5}
   .msg{font-size:12px;color:var(--gold);margin-top:14px;line-height:1.6;min-height:1.2em}
   .stamp{font-size:10px;color:var(--dim);margin-top:18px;letter-spacing:.08em;text-align:center}
@@ -83,9 +84,15 @@
     <label for="code">Room code</label>
     <input id="code" maxlength="4" placeholder="----" autocomplete="off"
            autocapitalize="characters" spellcheck="false">
-    <button class="go" id="joinBtn">Join</button>
+    <button class="go" id="joinBtn" onclick="
+      document.getElementById('stage').textContent = 'stage: tap registered';
+      if (window.joinTap) { joinTap(); }
+      else { document.getElementById('joinMsg').textContent =
+             'The page script never loaded, so Join cannot work. Tell Claude what the stage line says.'; }
+    ">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp">controller build 12</div>
+    <div class="stamp">controller build 13</div>
+    <div class="stamp" id="stage">stage: script has not started</div>
     <div class="stamp" id="libState">loading connection library…</div>
   </div>
 </div>
@@ -130,7 +137,7 @@
   ];
   let i = 0;
   (function tryNext(){
-    if(i >= sources.length){ mark('connection library unavailable — this page needs internet once'); return; }
+    if(i >= sources.length){ mark('connection library unavailable - this page needs internet once'); return; }
     const sc = document.createElement('script');
     sc.src = sources[i++];
     sc.crossOrigin = 'anonymous';
@@ -148,6 +155,8 @@
    ============================================================ */
 
 // Phones have no console, so anything that goes wrong gets shown on screen.
+document.getElementById('stage').textContent = 'stage: script running';
+
 window.onerror = function(msg, src, line){
   const m = document.getElementById('joinMsg');
   if(m) m.textContent = 'Script error: ' + msg + ' (line ' + line + ')';
@@ -170,11 +179,11 @@ let joinTimer = null;
 function say(msg){ $('joinMsg').textContent = msg; }
 
 function onJoinTap(){
-  say('Tap received…');
+  say('Tap received...');
   const code = ($('code').value || '').trim().toUpperCase();
   if(code.length !== 4){ say('Enter the four-letter code shown on the game screen.'); return; }
   if(typeof Peer === 'undefined'){
-    say('The connection library did not load. This phone needs internet for the first step — check its signal and reload the page.');
+    say('The connection library did not load. This phone needs internet for the first step - check its signal and reload the page.');
     return;
   }
   // a stale attempt must never leave the button stuck
@@ -183,7 +192,7 @@ function onJoinTap(){
   clearTimeout(joinTimer);
 
   $('joinBtn').disabled = true;
-  say('Step 1 of 2 — getting an address…');
+  say('Step 1 of 2 - getting an address...');
 
   joinTimer = setTimeout(() => {
     fail('Timed out. The game screen must have its lobby open, showing this same code, and both devices need to be on the same wifi.');
@@ -192,7 +201,7 @@ function onJoinTap(){
   peer = new Peer({pingInterval: 4000});
 
   peer.on('open', () => {
-    say('Step 2 of 2 — looking for room ' + code + '…');
+    say('Step 2 of 2 - looking for room ' + code + '...');
     conn = peer.connect('fsmash-' + code);      // reliable channel: widest support
     conn.on('open', () => {
       clearTimeout(joinTimer);
@@ -210,7 +219,7 @@ function onJoinTap(){
   peer.on('error', err => {
     const t = (err && err.type) || 'unknown';
     if(t === 'peer-unavailable'){
-      fail('No room called ' + code + '. Check the code on the game screen — it changes each time the lobby is opened.');
+      fail('No room called ' + code + '. Check the code on the game screen - it changes each time the lobby is opened.');
     } else if(t === 'network' || t === 'server-error' || t === 'socket-error'){
       fail('Could not reach the matchmaking server (' + t + '). This step needs internet.');
     } else {
@@ -219,10 +228,7 @@ function onJoinTap(){
   });
 }
 
-// bound three ways, so a stray CSS or gesture quirk can't swallow the tap
-$('joinBtn').onclick = onJoinTap;
-$('joinBtn').addEventListener('click', e => { e.preventDefault(); });
-$('joinBtn').addEventListener('touchend', e => { e.preventDefault(); onJoinTap(); });
+// The button's inline onclick calls window.joinTap, set at the end of this file.
 
 function fail(msg){
   clearTimeout(joinTimer);
@@ -374,6 +380,8 @@ if('wakeLock' in navigator){
   });
 }
 $('code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+window.joinTap = onJoinTap;
+document.getElementById('stage').textContent = 'stage: ready, press Join';
 
 // A link like .../controller.html#ABCD arrives with the room already filled in.
 // If the library is missing the Join button can never work, so say so now.
