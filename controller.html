@@ -94,7 +94,7 @@
              ' - stage was ' + document.getElementById('stage').textContent; }
     ">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp">controller build 17</div>
+    <div class="stamp">controller build 18</div>
     <div class="stamp" id="stage">stage: script has not started</div>
     <div class="stamp" id="err"></div>
     <div class="stamp" id="libState">loading connection library…</div>
@@ -170,8 +170,12 @@ window.joinTap = onJoinTap;
 
 window.onerror = function(msg, src, line){
   window.__err = msg + ' (line ' + line + ')';
-  const e = document.getElementById('err');
+  var e = document.getElementById('err');
   if(e) e.textContent = 'error: ' + window.__err;
+  var g = document.getElementById('diag');            // pad screen
+  if(g) g.textContent = 'error: ' + window.__err;
+  var st = document.getElementById('stage');          // join screen
+  if(st) st.textContent = 'stage: error - ' + window.__err;
   const b = document.getElementById('joinBtn');
   if(b) b.disabled = false;
   return false;
@@ -444,7 +448,9 @@ function keepAwake(){
   el.textContent += ok ? ' + pad ready' : ' + PAD BLOCK FAILED';
   if(!ok){
     var d = document.getElementById('diag');
-    if(d) d.textContent = 'PAD BLOCK FAILED TO PARSE - buttons will not send anything';
+    var why = window.__err ? (' - ' + window.__err) : ' - no message captured';
+    if(d) d.textContent = 'PAD BLOCK FAILED' + why;
+    el.textContent += why;
   }
 })();
 </script>
