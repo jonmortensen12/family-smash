@@ -41,6 +41,15 @@
   .chars button b{font-size:16px}
   .chars button span{display:block;font-size:11px;color:var(--dim);margin-top:3px}
   .chars button.sel{border-color:var(--gold);background:#252f1f}
+  select{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:12px}
+  .row{display:flex;gap:6px;flex-wrap:wrap}
+  .row button{flex:1;min-width:56px;padding:11px 8px;font-size:13px}
+  .row button.sel{background:var(--gold);border-color:var(--gold);color:#101720;font-weight:700}
+  .slotrow{display:flex;gap:8px;align-items:center;margin-bottom:7px}
+  .slotrow .dot{width:11px;height:11px;border-radius:50%;flex:none}
+  .slotrow select{flex:1}
+  .slotrow span{font-size:11px;color:var(--dim);width:62px;flex:none}
 
   /* ---- the pad ---- */
   #pad{background:#0a0e14}
@@ -62,20 +71,27 @@
   #stickTop{width:15vmin;height:15vmin;background:var(--slot);opacity:0}
   #stickHint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
     color:var(--dim);font-size:12px;text-align:center;line-height:1.7;pointer-events:none}
-  .btn{position:absolute;border-radius:50%;display:flex;align-items:center;
-    justify-content:center;font-size:12px;font-weight:700;letter-spacing:.04em;
-    background:#1b2634;border:2px solid var(--line);color:var(--ink)}
-  .btn.down{background:var(--gold);border-color:var(--gold);color:#101720;transform:scale(.94)}
-  .btn.wide{border-radius:16px}
-  #bAttack{width:23vmin;height:23vmin;right:6%;bottom:8%}
-  #bSpecial{width:19vmin;height:19vmin;right:31%;bottom:14%}
-  #bSmash{width:18vmin;height:18vmin;right:11%;bottom:37%}
-  #bGrab{width:16vmin;height:16vmin;right:34%;bottom:42%}
-  #bJump{width:20vmin;height:20vmin;right:2%;bottom:62%}
-  #bShield{width:26vmin;height:12vmin;right:30%;bottom:70%}
+  /* Right half is a 3x2 grid of full sections - no aiming required. */
+  #pads{position:absolute;right:0;top:0;bottom:0;width:52%;
+    display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1.25fr;gap:4px;padding:4px}
+  .btn{display:flex;align-items:center;justify-content:center;
+    font-size:2.6vmin;font-weight:700;letter-spacing:.06em;border-radius:10px;
+    background:#1b2634;border:2px solid var(--line);color:var(--ink);user-select:none}
+  .btn.down{background:var(--gold);border-color:var(--gold);color:#101720}
+  #bSpecial,#bAttack,#bSmash{font-size:3.1vmin}
+  #bAttack{background:#23303f}
+  #stickZone{width:48%}
+
+  /* Landscape is the only sensible way to hold this. */
+  #rotate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:var(--void);color:var(--ink);z-index:60;text-align:center;padding:30px;font-size:15px}
+  @media (orientation:portrait){ #rotate{display:flex} }
 </style>
 </head>
 <body>
+
+<div id="rotate">Turn your phone sideways<br><span style="font-size:12px;color:#7f93aa">
+Family Smash controllers work in landscape</span></div>
 
 <div id="join" class="screen on">
   <div class="card">
@@ -94,7 +110,7 @@
              ' - stage was ' + document.getElementById('stage').textContent; }
     ">Join</button>
     <div class="msg" id="joinMsg"></div>
-    <div class="stamp">controller build 19</div>
+    <div class="stamp">controller build 21</div>
     <div class="stamp" id="stage">stage: script has not started</div>
     <div class="stamp" id="err"></div>
     <div class="stamp" id="libState">loading connection library…</div>
@@ -109,13 +125,30 @@
   </div>
 </div>
 
+<div id="menu" class="screen">
+  <div class="card">
+    <h1>Game menu</h1>
+    <p class="sub">Anything here changes the game on the main screen for everyone.</p>
+    <label>Stage</label><select id="mStage"></select>
+    <label>Players</label><div class="row" id="mPlayers"></div>
+    <label>Fighters</label><div id="mSlots"></div>
+    <label>CPU difficulty</label><div class="row" id="mCpu"></div>
+    <label>Items</label><div class="row" id="mItems"></div>
+    <label>Sound</label><div class="row" id="mSfx"></div>
+    <label>Move name labels</label><div class="row" id="mLabels"></div>
+    <button class="go" id="mRestart">Restart match</button>
+    <button class="go" id="mBack" style="background:#2a3a4e;color:#e8eef6">Back to my controller</button>
+  </div>
+</div>
+
 <div id="pad" class="screen">
   <div id="bar">
     <span class="dot" id="barDot"></span>
     <span class="who" id="barWho">—</span>
     <span class="stk" id="barStk"></span>
     <span class="pct" id="barPct">0%</span>
-    <button id="changeBtn">Change</button>
+    <button id="changeBtn">Fighter</button>
+    <button id="menuBtn">Menu</button>
   </div>
   <div id="diag"></div>
   <div id="surface">
@@ -124,12 +157,14 @@
       <div id="stickBase"></div>
       <div id="stickTop"></div>
     </div>
-    <div class="btn" id="bShield">SHIELD</div>
-    <div class="btn" id="bJump">JUMP</div>
-    <div class="btn" id="bGrab">GRAB</div>
-    <div class="btn" id="bSmash">SMASH</div>
-    <div class="btn" id="bSpecial">SPECIAL</div>
-    <div class="btn" id="bAttack">ATTACK</div>
+    <div id="pads">
+      <div class="btn" id="bJump">JUMP</div>
+      <div class="btn" id="bGrab">GRAB</div>
+      <div class="btn" id="bShield">SHIELD</div>
+      <div class="btn" id="bSpecial">SPECIAL</div>
+      <div class="btn" id="bAttack">ATTACK</div>
+      <div class="btn" id="bSmash">SMASH</div>
+    </div>
   </div>
 </div>
 
@@ -185,7 +220,7 @@ const state = {x:0, y:0, b:0};
 let conn = null, peer = null, myChar = null, roster = [];
 
 const $ = id => document.getElementById(id);
-const show = id => ['join','pick','pad'].forEach(s =>
+const show = id => ['join','pick','pad','menu'].forEach(s =>
   $(s).classList.toggle('on', s === id));
 
 /* ---------- joining ---------- */
@@ -225,6 +260,7 @@ function onJoinTap(){
       show('pick');
       if(typeof startSending === 'function') startSending();
       if(typeof keepAwake === 'function') keepAwake();
+      if(typeof lockLandscape === 'function') lockLandscape();
     });
     conn.on('data', onHostData);
     conn.on('close', dropped);
@@ -269,6 +305,10 @@ function onHostData(d){
       $('barDot').style.background = d.color;
     }
     if(d.roster){ roster = d.roster; renderRoster(); }
+    if(d.menu){
+      MENU = d.menu;
+      if(document.getElementById('menu').classList.contains('on')) renderMenu();
+    }
     if(d.char){
       myChar = d.char;
       const c = roster.find(r => r.key === d.char);
@@ -427,6 +467,12 @@ function startSending(){ /* kept for compatibility; the loop starts itself */ }
 // Keeping the screen awake is a nicety. iOS throws synchronously if it is
 // asked outside a user gesture, so every call is wrapped and it only runs
 // after a successful join.
+function lockLandscape(){
+  try {
+    if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){});
+  } catch(e){}
+}
+
 function keepAwake(){
   try {
     if(!('wakeLock' in navigator)) return;
@@ -437,6 +483,76 @@ function keepAwake(){
     });
   } catch(e){}
 }
+</script>
+
+<script>
+/* ---------- the shared game menu ---------- */
+var MENU = null;
+function send(msg){ try { if(conn && conn.open) conn.send(msg); } catch(e){} }
+function cmd(c, v, extra){ send(Object.assign({t:'menu', cmd:c, value:v}, extra || {})); }
+
+function pills(host, options, current, onPick){
+  host.innerHTML = '';
+  options.forEach(function(o){
+    var b = document.createElement('button');
+    b.textContent = o.label;
+    if(o.value === current) b.className = 'sel';
+    b.onclick = function(){ onPick(o.value); };
+    host.appendChild(b);
+  });
+}
+
+function renderMenu(){
+  if(!MENU) return;
+  var st = document.getElementById('mStage');
+  st.innerHTML = '';
+  MENU.stages.forEach(function(sg){
+    var o = document.createElement('option');
+    o.value = sg.key; o.textContent = sg.name;
+    if(sg.key === MENU.stage) o.selected = true;
+    st.appendChild(o);
+  });
+  st.onchange = function(){ cmd('stage', st.value); };
+
+  var counts = [];
+  for(var n = 2; n <= 8; n++) counts.push({value:n, label:String(n)});
+  pills(document.getElementById('mPlayers'), counts, MENU.players, function(v){ cmd('players', v); });
+
+  pills(document.getElementById('mCpu'),
+    [{value:1,label:'Easy'},{value:2,label:'Medium'},{value:3,label:'Hard'}],
+    MENU.cpu, function(v){ cmd('cpu', v); });
+  pills(document.getElementById('mItems'),
+    [{value:true,label:'On'},{value:false,label:'Off'}], MENU.items, function(v){ cmd('items', v); });
+  pills(document.getElementById('mSfx'),
+    [{value:true,label:'On'},{value:false,label:'Off'}], MENU.sfx, function(v){ cmd('sfx', v); });
+  pills(document.getElementById('mLabels'),
+    [{value:true,label:'Show'},{value:false,label:'Hide'}], MENU.labels, function(v){ cmd('labels', v); });
+
+  var host = document.getElementById('mSlots');
+  host.innerHTML = '';
+  MENU.slots.forEach(function(sl, i){
+    var row = document.createElement('div');
+    row.className = 'slotrow';
+    var dot = document.createElement('span');
+    dot.className = 'dot'; dot.style.background = sl.color;
+    var lab = document.createElement('span');
+    lab.textContent = 'P' + (i+1) + ' ' + sl.label;
+    var sel = document.createElement('select');
+    roster.forEach(function(r){
+      var o = document.createElement('option');
+      o.value = r.key; o.textContent = r.name;
+      if(r.key === sl.key) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = function(){ cmd('char', sel.value, {slot:i}); };
+    row.appendChild(dot); row.appendChild(lab); row.appendChild(sel);
+    host.appendChild(row);
+  });
+}
+
+document.getElementById('menuBtn').onclick = function(){ show('menu'); renderMenu(); };
+document.getElementById('mBack').onclick = function(){ show('pad'); };
+document.getElementById('mRestart').onclick = function(){ cmd('restart'); show('pad'); };
 </script>
 
 <script>
